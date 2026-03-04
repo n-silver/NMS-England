@@ -54,8 +54,7 @@ export default function App() {
     turf.featureEach(voronoiPolygons, (currentFeature, featureIndex) => {
       if (currentFeature && englandFeature) {
         // Intersect mathematically crops the polygon
-        const intersection = turf.intersect(turf.featureCollection([currentFeature, englandFeature]));
-        if (intersection) {
+const intersection = turf.intersect(currentFeature, englandFeature);        if (intersection) {
           intersection.properties = { region: answers[featureIndex].region };
           clippedRegions.push(intersection);
         }
