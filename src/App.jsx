@@ -50,6 +50,9 @@ export default function App() {
         const intersection = turf.intersect(currentFeature, englandFeature);
         
         if (intersection) {
+          // Force correct D3-geo coordinate winding order to prevent inside-out rendering
+          turf.rewind(intersection, { reverse: true, mutate: true });
+          
           // Locate which specific city point lives inside this unclipped polygon
           const matchingPoint = answers.find(ans => 
             turf.booleanPointInPolygon(turf.point([ans.lng, ans.lat]), currentFeature)
