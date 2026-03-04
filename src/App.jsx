@@ -17,9 +17,7 @@ export default function App() {
   const [answers, setAnswers] = useState([]);
   const [geoData, setGeoData] = useState(null);
 
-  // Load the geographic boundaries on mount
   useEffect(() => {
-    // Note: You will need to host this JSON file in your /public folder
     fetch('/uk-ireland-boundaries.json')
       .then(res => res.json())
       .then(data => setGeoData(data))
@@ -34,29 +32,33 @@ export default function App() {
 
   const isComplete = currentIndex >= CITIES.length;
 
-  // Calculate Map Data using useMemo so it only runs once upon completion
   const mapShapes = useMemo(() => {
     if (!isComplete || !geoData) return null;
 
-    // 1. Separate England from the rest of the landmasses
     const englandFeature = geoData.features.find(f => f.properties.name === 'England');
     const otherFeatures = geoData.features.filter(f => f.properties.name !== 'England');
 
-    // 2. Generate chaotic Voronoi polygons
     const points = turf.featureCollection(
       answers.map(ans => turf.point([ans.lng, ans.lat], { region: ans.region }))
     );
-    // Expand bounding box slightly beyond the UK
     const voronoiPolygons = turf.voronoi(points, { bbox: [-11.0, 49.0, 3.0, 61.0] });
 
-    // 3. Clip the Voronoi polygons exactly to the English coastline/border
     const clippedRegions = [];
-    turf.featureEach(voronoiPolygons, (currentFeature, featureIndex) => {
+    turf.featureEach(voronoiPolygons, (currentFeature) => {
       if (currentFeature && englandFeature) {
-        // Intersect mathematically crops the polygon
-const intersection = turf.intersect(currentFeature, englandFeature);        if (intersection) {
-          intersection.properties = { region: answers[featureIndex].region };
-          clippedRegions.push(intersection);
+        // Crop the polygon to the English border
+        const intersection = turf.intersect(currentFeature, englandFeature);
+        
+        if (intersection) {
+          // Locate which specific city point lives inside this unclipped polygon
+          const matchingPoint = answers.find(ans => 
+            turf.booleanPointInPolygon(turf.point([ans.lng, ans.lat]), currentFeature)
+          );
+          
+          if (matchingPoint) {
+            intersection.properties = { region: matchingPoint.region };
+            clippedRegions.push(intersection);
+          }
         }
       }
     });
@@ -64,8 +66,6 @@ const intersection = turf.intersect(currentFeature, englandFeature);        if (
     return { otherFeatures, clippedRegions };
   }, [isComplete, answers, geoData]);
 
-  // Setup D3 Projection for the SVG map
-  // Centers on the UK and scales it to fit a 600x800 canvas
   const projection = geoMercator().center([-4.0, 54.5]).scale(2800).translate([300, 400]);
   const pathGenerator = geoPath().projection(projection);
 
@@ -94,7 +94,6 @@ const intersection = turf.intersect(currentFeature, englandFeature);        if (
           ) : (
             <div style={styles.svgWrapper}>
               <svg viewBox="0 0 600 800" width="100%" height="auto">
-                {/* Draw Wales, Scotland, Ireland in grey */}
                 {mapShapes?.otherFeatures.map((feature, i) => (
                   <path 
                     key={`other-${i}`} 
@@ -104,8 +103,6 @@ const intersection = turf.intersect(currentFeature, englandFeature);        if (
                     strokeWidth="1" 
                   />
                 ))}
-                
-                {/* Draw the specific clipped regions of England */}
                 {mapShapes?.clippedRegions.map((feature, i) => (
                   <path 
                     key={`region-${i}`} 
